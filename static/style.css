@@ -1,0 +1,184 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+    max-width: 480px;
+    width: 100%;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header h2 {
+    margin: 0;
+    color: #ff5722;
+    font-weight: 600;
+    font-size: 28px;
+}
+
+.header p {
+    margin: 5px 0 0;
+    color: #888;
+    font-size: 14px;
+}
+
+/* File Upload Premium UI */
+.file-upload-wrapper {
+    position: relative;
+    width: 100%;
+    height: 120px;
+    border: 2px dashed #ff9a76;
+    border-radius: 16px;
+    background-color: #fffaf8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-upload-wrapper:hover {
+    background-color: #ffebd9;
+    border-color: #ff5722;
+}
+
+.file-upload-wrapper input[type="file"] {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.upload-text {
+    color: #ff5722;
+    font-weight: 500;
+}
+
+/* Loading Animation */
+.hidden {
+    display: none !important;
+}
+
+#loading {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #ff5722;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Result Card - No Buttons, Pure Aesthetics */
+.result-card {
+    background: #fafbfc;
+    border-radius: 16px;
+    padding: 25px;
+    border: 1px solid #edf2f7;
+}
+
+.result-title {
+    font-size: 18px;
+    color: #2d3748;
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+.instruction {
+    font-size: 12px;
+    color: #a0aec0;
+    margin-bottom: 20px;
+}
+
+/* Tag Rows */
+.tag-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tag-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.tag-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.tag-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #718096;
+}
+
+/* Editable Chips */
+.tag-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+    transition: box-shadow 0.2s;
+    display: inline-block;
+    min-width: 40px;
+    text-align: center;
+}
+
+.tag-chip:focus {
+    box-shadow: 0 0 0 2px #cbd5e0;
+    background-color: #fff;
+}
+
+/* Different Colors for Different Categories */
+.cuisine-chip { background-color: #ebf8ff; color: #3182ce; }
+.taste-chip { background-color: #fff5f5; color: #e53e3e; margin-left: 5px; }
+.food-chip { background-color: #f0fff4; color: #38a169; }
+.meal-chip { background-color: #faf5ff; color: #805ad5; }
+.dining-chip { background-color: #fffff0; color: #d69e2e; }
+
+.taste-tags-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 5px;
+}
+
+.error {
+    color: #e53e3e;
+    text-align: center;
+    background: #fff5f5;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 15px;
+    font-size: 14px;
+}

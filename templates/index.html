@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TasteFeed AI - Premium Tagger</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>✨ TasteFeed AI</h2>
+            <p>Smart Content Labeling</p>
+        </div>
+        
+        <form id="uploadForm" class="upload-section">
+            <div class="file-upload-wrapper">
+                <input type="file" id="videoInput" accept="video/*" required>
+                <p class="upload-text">Drag & Drop or Click to Upload Video</p>
+            </div>
+        </form>
+
+        <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <p>AI is analyzing the food...</p>
+        </div>
+
+        <div id="errorMsg" class="hidden error"></div>
+
+        <div id="reviewSection" class="hidden result-card">
+            <h3 class="result-title">AI Suggested Tags</h3>
+            <p class="instruction">Click on any tag to edit the text directly.</p>
+            
+            <div class="tag-container">
+                <div class="tag-row">
+                    <span class="tag-label">Cuisine</span>
+                    <span class="tag-chip cuisine-chip" id="cuisine" contenteditable="true"></span>
+                </div>
+                
+                <div class="tag-row">
+                    <span class="tag-label">Taste Profile</span>
+                    <div id="taste_tags" class="taste-tags-wrapper">
+                        </div>
+                </div>
+                
+                <div class="tag-row">
+                    <span class="tag-label">Food Type</span>
+                    <span class="tag-chip food-chip" id="food_type" contenteditable="true"></span>
+                </div>
+                
+                <div class="tag-row">
+                    <span class="tag-label">Meal Time</span>
+                    <span class="tag-chip meal-chip" id="meal_type" contenteditable="true"></span>
+                </div>
+                
+                <div class="tag-row">
+                    <span class="tag-label">Dining Mode</span>
+                    <span class="tag-chip dining-chip" id="dining_mode" contenteditable="true"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // File input auto-submit logic for seamless experience
+        document.getElementById('videoInput').addEventListener('change', async function(e) {
+            const videoFile = this.files[0];
+            if (!videoFile) return;
+
+            const formData = new FormData();
+            formData.append('video', videoFile);
+
+            // UI Transitions
+            document.querySelector('.upload-section').style.display = 'none';
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('reviewSection').classList.add('hidden');
+            document.getElementById('errorMsg').classList.add('hidden');
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if(result.error) {
+                    document.getElementById('errorMsg').innerText = "Error: " + result.error;
+                    document.getElementById('errorMsg').classList.remove('hidden');
+                    document.querySelector('.upload-section').style.display = 'block';
+                } else {
+                    // Populate elegant tags
+                    document.getElementById('cuisine').innerText = result.cuisine || 'Unknown';
+                    document.getElementById('food_type').innerText = result.food_type || 'Unknown';
+                    document.getElementById('meal_type').innerText = result.meal_type || 'Unknown';
+                    document.getElementById('dining_mode').innerText = result.dining_mode || 'Unknown';
+                    
+                    // Handle multiple taste tags
+                    const tasteWrapper = document.getElementById('taste_tags');
+                    tasteWrapper.innerHTML = '';
+                    if (result.taste_tags && result.taste_tags.length > 0) {
+                        result.taste_tags.forEach(tag => {
+                            const span = document.createElement('span');
+                            span.className = 'tag-chip taste-chip';
+                            span.contentEditable = "true";
+                            span.innerText = tag;
+                            tasteWrapper.appendChild(span);
+                        });
+                    } else {
+                        const span = document.createElement('span');
+                        span.className = 'tag-chip taste-chip';
+                        span.contentEditable = "true";
+                        span.innerText = "N/A";
+                        tasteWrapper.appendChild(span);
+                    }
+                    
+                    // Show results
+                    document.getElementById('reviewSection').classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('errorMsg').innerText = "System Error: " + error;
+                document.getElementById('errorMsg').classList.remove('hidden');
+                document.querySelector('.upload-section').style.display = 'block';
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
