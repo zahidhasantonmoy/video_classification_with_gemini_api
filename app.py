@@ -8,7 +8,7 @@ from PIL import Image
 from decord import VideoReader, cpu
 
 # API Key Setup
-API_KEY = "AIzaSyBbCawu7bH5Uz9ldNEaIjToLS_ZiV0swbc"
+API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=API_KEY)
 
 app = Flask(__name__)
