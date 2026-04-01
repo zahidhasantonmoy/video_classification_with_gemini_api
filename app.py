@@ -7,25 +7,30 @@ import google.generativeai as genai
 from PIL import Image
 from decord import VideoReader, cpu
 
-# API Key Setup
+# API Key Environment Variable থেকে নেওয়া হচ্ছে
 API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=API_KEY)
 
 app = Flask(__name__)
 
-def extract_frames(video_path, num_frames=4):
+def extract_frames(video_path, num_frames=3):
+    # Render এর ফ্রি টিয়ারে র‍্যাম বাঁচাতে ফ্রেম সংখ্যা ৩ করা হলো
     vr = VideoReader(video_path, ctx=cpu(0))
     total_frames = len(vr)
     indices = np.linspace(0, total_frames-1, num_frames, dtype=int)
     frames = vr.get_batch(indices).asnumpy()
-    return [Image.fromarray(frame) for frame in frames]
+    
+    pil_frames = []
+    for frame in frames:
+        img = Image.fromarray(frame)
+        # মেমোরি এবং API লিমিট বাঁচাতে সাইজ ছোট করা হচ্ছে
+        img.thumbnail((512, 512)) 
+        pil_frames.append(img)
+        
+    return pil_frames
 
 def get_working_model():
-    available_models = []
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            available_models.append(m.name)
-    
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']:
         if preferred in available_models:
             return preferred
@@ -57,10 +62,8 @@ def analyze():
             return jsonify({"error": "No supported Gemini models found."})
 
         model = genai.GenerativeModel(model_name)
-
         prompt = """
         Analyze these frames from a food video. Return ONLY valid JSON and nothing else.
-        Structure:
         {
           "cuisine": "Bangladeshi / Indian / Asian / Others",
           "taste_tags": ["spicy", "savory", "sweet", "creamy"],
@@ -69,28 +72,15 @@ def analyze():
           "dining_mode": "restaurant / homemade / street_food"
         }
         """
-        
         response = model.generate_content(frames + [prompt])
         
         raw_text = response.text.strip()
-        if raw_text.startswith("```json"):
-            raw_text = raw_text[7:]
-        if raw_text.startswith("```"):
-            raw_text = raw_text[3:]
-        if raw_text.endswith("```"):
-            raw_text = raw_text[:-3]
-            
-        result = json.loads(raw_text.strip())
-        
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        
-        return jsonify(result)
+        if raw_text.startswith("
+http://googleusercontent.com/immersive_entry_chip/0
+http://googleusercontent.com/immersive_entry_chip/1
+http://googleusercontent.com/immersive_entry_chip/2
 
-    except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        return jsonify({"error": str(e)})
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+### গিটহাবে পুশ করার আগে চেক করো:
+১. এই তিনটি ফাইলে কোডগুলো বসানোর পর তোমার গিটহাব রিপোজিটরিতে আবার পুশ করো।
+২. Render অটোমেটিক্যালি নতুন কোড বিল্ড করা শুরু করবে।
+৩. এইবার মেমোরি কম খাবে বলে ক্র্যাশ করার চান্স অনেক কম। যদি তারপরেও সার্ভার এরর আসে, তবে নতুন এরর মেসেজটি সরাসরি স্ক্রিনে দেখতে পাবে (JSON.parse এরর আর দেখাবে না)।
