@@ -7,7 +7,7 @@ import google.generativeai as genai
 from PIL import Image
 from decord import VideoReader, cpu
 
-# API Key Environment Variable থেকে নেওয়া হচ্ছে
+# API Key Environment Variable থেকে নেওয়া হচ্ছে (Render-এ সেট করা Key)
 API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=API_KEY)
 
@@ -42,6 +42,9 @@ def index():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
+    if not API_KEY:
+        return jsonify({"error": "API Key is missing in environment variables!"})
+
     if 'video' not in request.files:
         return jsonify({"error": "No video uploaded"})
     
@@ -74,13 +77,22 @@ def analyze():
         """
         response = model.generate_content(frames + [prompt])
         
+        # JSON String থেকে Markdown ট্যাগ মুছে ফেলার সহজ ও নিরাপদ উপায়
         raw_text = response.text.strip()
-        if raw_text.startswith("
-http://googleusercontent.com/immersive_entry_chip/0
-http://googleusercontent.com/immersive_entry_chip/1
-http://googleusercontent.com/immersive_entry_chip/2
+        raw_text = raw_text.replace("```json", "")
+        raw_text = raw_text.replace("```", "")
+            
+        result = json.loads(raw_text.strip())
+        
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
+        return jsonify(result)
 
-### গিটহাবে পুশ করার আগে চেক করো:
-১. এই তিনটি ফাইলে কোডগুলো বসানোর পর তোমার গিটহাব রিপোজিটরিতে আবার পুশ করো।
-২. Render অটোমেটিক্যালি নতুন কোড বিল্ড করা শুরু করবে।
-৩. এইবার মেমোরি কম খাবে বলে ক্র্যাশ করার চান্স অনেক কম। যদি তারপরেও সার্ভার এরর আসে, তবে নতুন এরর মেসেজটি সরাসরি স্ক্রিনে দেখতে পাবে (JSON.parse এরর আর দেখাবে না)।
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return jsonify({"error": str(e)})
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
