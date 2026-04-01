@@ -2,31 +2,41 @@ import os
 import json
 import tempfile
 import numpy as np
+import cv2  # decord এর বদলে OpenCV ব্যবহার করা হচ্ছে
 from flask import Flask, request, jsonify, render_template
 import google.generativeai as genai
 from PIL import Image
-from decord import VideoReader, cpu
 
-# API Key Environment Variable থেকে নেওয়া হচ্ছে (Render-এ সেট করা Key)
+# API Key Environment Variable থেকে নেওয়া হচ্ছে
 API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=API_KEY)
 
 app = Flask(__name__)
 
 def extract_frames(video_path, num_frames=3):
-    # Render এর ফ্রি টিয়ারে র‍্যাম বাঁচাতে ফ্রেম সংখ্যা ৩ করা হলো
-    vr = VideoReader(video_path, ctx=cpu(0))
-    total_frames = len(vr)
-    indices = np.linspace(0, total_frames-1, num_frames, dtype=int)
-    frames = vr.get_batch(indices).asnumpy()
-    
+    """
+    OpenCV ব্যবহার করে ফ্রেম এক্সট্রাক্ট করা হচ্ছে।
+    এটি পুরো ভিডিও র‍্যামে লোড করে না, তাই সার্ভার ক্র্যাশ করবে না।
+    """
+    cap = cv2.VideoCapture(video_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     pil_frames = []
-    for frame in frames:
-        img = Image.fromarray(frame)
-        # মেমোরি এবং API লিমিট বাঁচাতে সাইজ ছোট করা হচ্ছে
-        img.thumbnail((512, 512)) 
-        pil_frames.append(img)
-        
+
+    if total_frames > 0:
+        indices = np.linspace(0, total_frames-1, num_frames, dtype=int)
+        for idx in indices:
+            # নির্দিষ্ট ফ্রেমে গিয়ে শুধু ওই ছবিটি রিড করা
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if ret:
+                # OpenCV BGR ফরম্যাটে ছবি দেয়, সেটাকে RGB তে কনভার্ট করা
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame_rgb)
+                # মেমোরি বাঁচাতে সাইজ ছোট করা হচ্ছে
+                img.thumbnail((512, 512)) 
+                pil_frames.append(img)
+                
+    cap.release()
     return pil_frames
 
 def get_working_model():
@@ -54,13 +64,17 @@ def analyze():
 
     temp_path = ""
     try:
+        # ভিডিও সাময়িকভাবে সেভ করা
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_video:
             video_file.save(temp_video.name)
             temp_path = temp_video.name
 
         frames = extract_frames(temp_path)
-        model_name = get_working_model()
         
+        if not frames:
+            return jsonify({"error": "Could not read video frames. Try a different MP4 file."})
+
+        model_name = get_working_model()
         if not model_name:
             return jsonify({"error": "No supported Gemini models found."})
 
@@ -77,7 +91,6 @@ def analyze():
         """
         response = model.generate_content(frames + [prompt])
         
-        # JSON String থেকে Markdown ট্যাগ মুছে ফেলার সহজ ও নিরাপদ উপায়
         raw_text = response.text.strip()
         raw_text = raw_text.replace("```json", "")
         raw_text = raw_text.replace("```", "")
