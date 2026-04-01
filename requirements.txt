@@ -1,6 +1,4 @@
 flask
 google-generativeai
-opencv-python-headless
 pillow
-numpy
 gunicorn

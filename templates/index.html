@@ -14,7 +14,6 @@
             <p>Upload a video to auto-generate food tags</p>
         </div>
         
-        <!-- Upload Section -->
         <div class="upload-section" id="uploadBox">
             <input type="file" id="videoInput" accept="video/*" required>
             <div class="upload-content">
@@ -23,21 +22,19 @@
             </div>
         </div>
 
-        <!-- Preview Section (Hidden initially) -->
         <div id="previewSection" class="hidden">
-            <video id="videoPreview" controls muted></video>
+            <!-- ভিডিও লোড হবে কিন্তু ইউজার দেখতে পারবে controls দিয়ে -->
+            <video id="videoPreview" controls muted crossorigin="anonymous"></video>
             <button id="analyzeBtn" class="primary-btn">Analyze Food with AI</button>
         </div>
 
-        <!-- Loading State -->
         <div id="loading" class="hidden">
             <div class="spinner"></div>
-            <p>AI is analyzing frames... Please wait.</p>
+            <p>Extracting frames & Analyzing... Please wait.</p>
         </div>
 
         <div id="errorMsg" class="hidden error"></div>
 
-        <!-- Result Section -->
         <div id="reviewSection" class="hidden result-card">
             <h3 class="result-title">AI Suggested Tags</h3>
             <p class="instruction">Click on any tag to edit the text directly.</p>
@@ -53,39 +50,92 @@
         </div>
     </div>
 
+    <!-- ফ্রেম কাটার জন্য লুকানো ক্যানভাস -->
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
     <script>
         let selectedFile = null;
+        const videoElement = document.getElementById('videoPreview');
+        const canvas = document.getElementById('hiddenCanvas');
+        const ctx = canvas.getContext('2d');
 
-        // Handle Video Selection & Preview
         document.getElementById('videoInput').addEventListener('change', function(e) {
             selectedFile = this.files[0];
             if (!selectedFile) return;
 
-            // Show video preview
             const videoUrl = URL.createObjectURL(selectedFile);
-            document.getElementById('videoPreview').src = videoUrl;
+            videoElement.src = videoUrl;
             
-            // Switch UI
             document.getElementById('uploadBox').style.display = 'none';
             document.getElementById('previewSection').classList.remove('hidden');
             document.getElementById('errorMsg').classList.add('hidden');
             document.getElementById('reviewSection').classList.add('hidden');
         });
 
-        // Handle Analysis
+        // ব্রাউজারেই ফ্রেম এক্সট্র্যাক্ট করার জাদুকরী ফাংশন!
+        async function extractFramesFromVideo() {
+            return new Promise((resolve) => {
+                const duration = videoElement.duration;
+                if (!duration || isNaN(duration)) {
+                    // ভিডিও ডিউরেশন না পেলে ডিফল্ট হিসেবে ২ সেকেন্ড পর পর নিবে
+                    resolve(captureSpecificTimes([1, 2, 3]));
+                    return;
+                }
+                
+                // ভিডিওর শুরু, মাঝখান এবং শেষের দিকের ৩টি টাইম বের করা
+                const times = [
+                    duration * 0.1,
+                    duration * 0.5,
+                    duration * 0.9
+                ];
+                resolve(captureSpecificTimes(times));
+            });
+        }
+
+        async function captureSpecificTimes(times) {
+            const frames = [];
+            
+            // ক্যানভাসের সাইজ ছোট করে দেওয়া হলো যাতে Base64 সাইজ ছোট হয়
+            canvas.width = 400;
+            canvas.height = 400;
+
+            for (let time of times) {
+                await new Promise((resolveSeek) => {
+                    videoElement.currentTime = time;
+                    videoElement.addEventListener('seeked', function onSeeked() {
+                        videoElement.removeEventListener('seeked', onSeeked);
+                        
+                        // ভিডিওর বর্তমান ফ্রেমটি ক্যানভাসে আঁকা
+                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        
+                        // ক্যানভাস থেকে ছবি (JPEG) বের করে Base64 করা
+                        const base64Image = canvas.toDataURL('image/jpeg', 0.6); // 60% quality
+                        frames.push(base64Image);
+                        
+                        resolveSeek();
+                    }, { once: true });
+                });
+            }
+            return frames;
+        }
+
         document.getElementById('analyzeBtn').addEventListener('click', async function() {
             if (!selectedFile) return;
-
-            const formData = new FormData();
-            formData.append('video', selectedFile);
 
             document.getElementById('previewSection').classList.add('hidden');
             document.getElementById('loading').classList.remove('hidden');
 
             try {
-                const response = await fetch('/analyze', {
+                // ১. ব্রাউজারেই ফ্রেম কাটা (সার্ভারে কোনো চাপ নেই!)
+                const frames = await extractFramesFromVideo();
+
+                // ২. শুধু ছোট ৩টি ছবি সার্ভারে পাঠানো
+                const response = await fetch('/analyze_frames', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ frames: frames })
                 });
                 
                 const textResponse = await response.text();
@@ -94,14 +144,13 @@
                 try {
                     result = JSON.parse(textResponse);
                 } catch (parseError) {
-                    throw new Error("Server Out of Memory. Video is too large for free tier.");
+                    throw new Error("Server Response Error. Raw response: " + textResponse.substring(0, 50));
                 }
                 
                 if(result.error) {
                     throw new Error(result.error);
                 }
 
-                // Populate Data
                 document.getElementById('cuisine').innerText = result.cuisine || 'Unknown';
                 document.getElementById('food_type').innerText = result.food_type || 'Unknown';
                 document.getElementById('meal_type').innerText = result.meal_type || 'Unknown';
@@ -128,7 +177,6 @@
             }
         });
 
-        // Reset Button
         document.getElementById('resetBtn').addEventListener('click', function() {
             document.getElementById('videoInput').value = "";
             selectedFile = null;

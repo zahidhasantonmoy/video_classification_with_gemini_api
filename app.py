@@ -1,43 +1,18 @@
 import os
 import json
-import tempfile
-import numpy as np
-import cv2  # decord এর বদলে OpenCV ব্যবহার করা হচ্ছে
+import base64
+from io import BytesIO
 from flask import Flask, request, jsonify, render_template
 import google.generativeai as genai
 from PIL import Image
 
-# API Key Environment Variable থেকে নেওয়া হচ্ছে
 API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=API_KEY)
 
 app = Flask(__name__)
 
-def extract_frames(video_path, num_frames=3):
-    """
-    OpenCV ব্যবহার করে ফ্রেম এক্সট্রাক্ট করা হচ্ছে।
-    এটি পুরো ভিডিও র‍্যামে লোড করে না, তাই সার্ভার ক্র্যাশ করবে না।
-    """
-    cap = cv2.VideoCapture(video_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    pil_frames = []
-
-    if total_frames > 0:
-        indices = np.linspace(0, total_frames-1, num_frames, dtype=int)
-        for idx in indices:
-            # নির্দিষ্ট ফ্রেমে গিয়ে শুধু ওই ছবিটি রিড করা
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-            ret, frame = cap.read()
-            if ret:
-                # OpenCV BGR ফরম্যাটে ছবি দেয়, সেটাকে RGB তে কনভার্ট করা
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img = Image.fromarray(frame_rgb)
-                # মেমোরি বাঁচাতে সাইজ ছোট করা হচ্ছে
-                img.thumbnail((512, 512)) 
-                pil_frames.append(img)
-                
-    cap.release()
-    return pil_frames
+# Flask-এ রিকোয়েস্ট সাইজ লিমিট বাড়ানো হলো (যাতে ৩টি Base64 ছবি আসতে পারে)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16 MB
 
 def get_working_model():
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -50,29 +25,31 @@ def get_working_model():
 def index():
     return render_template('index.html')
 
-@app.route('/analyze', methods=['POST'])
-def analyze():
+@app.route('/analyze_frames', methods=['POST'])
+def analyze_frames():
     if not API_KEY:
         return jsonify({"error": "API Key is missing in environment variables!"})
 
-    if 'video' not in request.files:
-        return jsonify({"error": "No video uploaded"})
-    
-    video_file = request.files['video']
-    if video_file.filename == '':
-        return jsonify({"error": "No selected video"})
+    data = request.json
+    if not data or 'frames' not in data:
+        return jsonify({"error": "No frames received from frontend."})
 
-    temp_path = ""
+    base64_frames = data['frames']
+    if not base64_frames or len(base64_frames) == 0:
+        return jsonify({"error": "Empty frames array."})
+
     try:
-        # ভিডিও সাময়িকভাবে সেভ করা
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_video:
-            video_file.save(temp_video.name)
-            temp_path = temp_video.name
-
-        frames = extract_frames(temp_path)
-        
-        if not frames:
-            return jsonify({"error": "Could not read video frames. Try a different MP4 file."})
+        pil_frames = []
+        for b64_str in base64_frames:
+            # Base64 স্ট্রিং থেকে "data:image/jpeg;base64," অংশটুকু বাদ দেওয়া
+            if "," in b64_str:
+                b64_str = b64_str.split(",")[1]
+            
+            image_data = base64.b64decode(b64_str)
+            img = Image.open(BytesIO(image_data))
+            # মেমোরি ও টোকেন বাঁচাতে আরও ছোট করা হলো
+            img.thumbnail((300, 300))
+            pil_frames.append(img)
 
         model_name = get_working_model()
         if not model_name:
@@ -89,22 +66,17 @@ def analyze():
           "dining_mode": "restaurant / homemade / street_food"
         }
         """
-        response = model.generate_content(frames + [prompt])
+        response = model.generate_content(pil_frames + [prompt])
         
         raw_text = response.text.strip()
         raw_text = raw_text.replace("```json", "")
         raw_text = raw_text.replace("```", "")
             
         result = json.loads(raw_text.strip())
-        
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
             
         return jsonify(result)
 
     except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
         return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
